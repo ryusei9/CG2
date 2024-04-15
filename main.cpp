@@ -52,7 +52,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// ウィンドウスタイル
 		WS_OVERLAPPEDWINDOW,
 		// 表示X座標
-	)
+		CW_USEDEFAULT,
+		// 表示Y座標
+		CW_USEDEFAULT,
+		// ウィンドウ横幅
+		wrc.right - wrc.left,
+		// ウィンドウ縦幅
+		wrc.bottom - wrc.top,
+		// 親ウィンドウハンドル
+		nullptr,
+		// メニューハンドル
+		nullptr,
+		// インスタンスハンドル
+		wc.hInstance,
+		// オプション
+		nullptr);
+
+	// ウィンドウを表示する
+	ShowWindow(hwnd, SW_SHOW);
 
 	// 出力ウィンドウへの文字出力
 	OutputDebugStringA("Hello,DirectX!\n");
