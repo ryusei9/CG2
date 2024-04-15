@@ -1,20 +1,10 @@
 #include <Windows.h>
+#pragma warning(push)
+// C4023の警告を見なかったことにする
+#pragma warning(disable:4023)
 
-// ウィンドウプロシーシャ
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg,
-	WPARAM wparam, LPARAM lparam) {
-	// メッセージに応じてゲーム固有の処理を行う
-	switch (msg) {
-		// ウィンドウが破棄された
-	case WM_DESTROY:
-		// OSに対して、アプリの終了を伝える
-		PostQuitMessage(0);
-		return 0;
-	}
+#pragma warning(pop)
 
-	// 標準のメッセージ処理を行う
-	return DefWindowProc(hwnd, msg, wparam, lparam);
-}
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 出力ウィンドウへの文字出力
