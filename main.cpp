@@ -60,6 +60,10 @@ std::string ConvertString(const std::wstring& str) {
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
+	///////////////////////
+	// ウィンドウの作成
+	///////////////////////
+
 	WNDCLASS wc{};
 	// ウィンドウプロシーシャ
 	wc.lpfnWndProc = WindowProc;
@@ -121,7 +125,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	std::string str1{ std::to_string(10) };
 
 	// 変数から型を推論してくれる
-	Log(std::format("str0:{},str1:{}\n", str0,str1));
+	Log(std::format("str0:{},str1:{}\n", str0, str1));
+
+	////////////////////
+	// デバッグレイヤー
+	////////////////////
+
+#ifdef _DEBUG
+	ID3D12Debug1* debugController = nullptr;
+	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+		// デバッグレイヤーを有効化する
+		debugController->EnableDebugLayer();
+		// さらにGPU側でもチェックを行うようにする
+		debugController->SetEnableGPUBasedValidation(TRUE);
+	}
+#endif
+
+	//////////////////////
+	// DirectX12の初期化
+	//////////////////////
 
 	// DXGIファクトリーの生成
 	IDXGIFactory7* dxgiFactory = nullptr;
@@ -172,6 +194,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	assert(device != nullptr);
 	// 初期化完了のログを出す
 	Log("Complete create D3D12Device!!!\n");
+
+#ifdef _DEBUG
+	ID3D12InfoQueue* infoQueue = nullptr;
+	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
+		// ヤバいエラー時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+		// エラー時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+		// 警告時に止まる
+		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+
+		// 抑制するメッセージ
+		D3D12_MESSAGE_ID denyIds[] = {
+			// Windows11でのDXGIデバッグレイヤーの相互作用バグによるエラーメッセージ
+			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
+		};
+		// 抑制するレベル
+		D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
+		D3D12_INFO_QUEUE_FILTER filter{};
+
+		filter.DenyList.NumIDs = _countof(denyIds);
+		filter.DenyList.pIDList = denyIds;
+		filter.DenyList.NumSeverities = _countof(severities);
+		filter.DenyList.pSeverityList = severities;
+		// 指定したメッセージの表示を抑制する
+		infoQueue->PushStorageFilter(&filter);
+		// 解放
+		infoQueue->Release();
+	}
+#endif
 
 	// コマンドキューを生成する
 	ID3D12CommandQueue* commandQueue = nullptr;
@@ -259,36 +311,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 2つ目を作る
 	device->CreateRenderTargetView(swapChainResources[1], &rtvDesc, rtvHandles[1]);
 
-	///////////////////
-	// コマンドをキック
-	///////////////////
 
-	// これから書き込むバックバッファのインデックスを取得する
-	UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
-	// 描画先のRTVを設定
-	commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
-
-	// 指定した色で画面全体をクリアする
-	// 青っぽい色。RGBA
-	float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };
-	commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
-
-	// コマンドリストの内容を確定させる。すべてのコマンドを積んでcloseすること
-	hr = commandList->Close();
-	assert(SUCCEEDED(hr));
-
-	// GPUにコマンドリストの実行を行わせる
-	ID3D12CommandList* commandLists[] = { commandList };
-	commandQueue->ExecuteCommandLists(1, commandLists);
-
-	// GPUとOSに画面の交換を行うよう通知する
-	swapChain->Present(1, 0);
-
-	// 次のフレーム用のコマンドリストを準備
-	hr = commandAllocator->Reset();
-	assert(SUCCEEDED(hr));
-	hr = commandList->Reset(commandAllocator, nullptr);
-	assert(SUCCEEDED(hr));
 
 	MSG msg{};
 	// ウィンドウの×ボタンが押されるまでループ
@@ -299,7 +322,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			DispatchMessage(&msg);
 		} else {
 			// ゲームの処理
+			///////////////////
+			// コマンドをキック
+			///////////////////
 
+			// これから書き込むバックバッファのインデックスを取得する
+			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+			// 描画先のRTVを設定
+			commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], false, nullptr);
+
+			// 指定した色で画面全体をクリアする
+			// 青っぽい色。RGBA
+			float clearColor[] = { 0.1f,0.25f,0.5f,1.0f };
+			commandList->ClearRenderTargetView(rtvHandles[backBufferIndex], clearColor, 0, nullptr);
+
+			// コマンドリストの内容を確定させる。すべてのコマンドを積んでcloseすること
+			hr = commandList->Close();
+			assert(SUCCEEDED(hr));
+
+			// GPUにコマンドリストの実行を行わせる
+			ID3D12CommandList* commandLists[] = { commandList };
+			commandQueue->ExecuteCommandLists(1, commandLists);
+
+			// GPUとOSに画面の交換を行うよう通知する
+			swapChain->Present(1, 0);
+
+			// 次のフレーム用のコマンドリストを準備
+			hr = commandAllocator->Reset();
+			assert(SUCCEEDED(hr));
+			hr = commandList->Reset(commandAllocator, nullptr);
+			assert(SUCCEEDED(hr));
 		}
 	}
 
