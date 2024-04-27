@@ -560,16 +560,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	/////////////////////
 
 	//// WVP用のリソースを作る。
-	//ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
 
 	//// データを書き込む
-	//Matrix4x4* wvpData = nullptr;
+	Matrix4x4* wvpData = nullptr;
 
 	//// 書き込むためのアドレスを取得
-	//wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
 
 	//// 単位行列を書き込んでおく
-	//*wvpData = MakeIdentity4x4();
+	*wvpData = MakeIdentity4x4();
 
 	//////////////////
 	//// 21ページ
@@ -972,7 +972,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
 			// wvp用のCBufferの場所を設定
-			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
 			commandList->DrawInstanced(3, 1, 0, 0);
