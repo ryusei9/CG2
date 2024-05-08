@@ -387,8 +387,58 @@ IDxcBlob* CompileShader(
 	return shaderBlob;
 }
 
+// DirectXTexを使ってTextureを読むためのLoadTexture関数
+DirectX::ScratchImage LoadTexture(const std::string& filePath) {
+	// テクスチャファイルを読んでプログラムで扱えるようにする
+	DirectX::ScratchString image{};
+	std::wstring filePathW = ConvertString(filePath);
+	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
+	assert(SUCCEEDED(hr));
+
+	// ミップマップの作成
+	DirectX::ScratchImage mipImages{};
+	hr = DirectX::GenerateNipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);
+
+	// ミップマップ付きのデータを渡す
+	return mipImages;
+}
+
+// DirectX12のTextureResourceを作る
+ID3D12Resource* CreateTextureResource(ID3D12Device* device, const DirectX::TexMetadata& metadata) {
+	// metadataを基にResourceの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	// Textureの幅
+	resourceDesc.Width = UINT(metadata.width);
+	// Textureの高さ
+	resourceDesc.Height = UINT(metadata.height);
+	// mipmapの数
+	resourceDesc.MipLevels = UINT16(metadata.mipLevels);
+	// 奥行き or 配列Textureの配列数
+	resourceDesc.DepthOrArraySize = UINT16(metadata.arraySize);
+	// TextureのFormat
+	resourceDesc.Format = metadata.format;
+	// サンプリングカウント。1固定
+	resourceDesc.SampleDesc.Count = 1;
+	// textureの次元数。普段使っているのは2次元
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION(metadata.dimension);
+
+	// 利用するHeapの設定
+	D3D12_HEAP_PROPERTIES heapProperties{};
+	// 細かい設定を行う
+	heapProperties.Type = D3D12_HEAP_TYPE_CUSTOM;
+	// WriteBackポリシーでCPUアクセス可能
+	heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK;
+	// プロセッサの近くに配置
+	heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_L0;
+
+	// ページ18
+}
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+
+	// COMの初期化
+	CoInitializeEx(0, COINIT_MULTITHREADED);
 
 	///////////////////////
 	// ウィンドウの作成
@@ -1070,6 +1120,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		debug->Release();
 	}
-
+	// COMの終了処理
+	CoUninitialize();
 	return 0;
 }
