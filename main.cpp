@@ -539,21 +539,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.pParameters = rootParameters;
 	// 配列の長さ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);
-	// リソースの作成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
-	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
-	// マテリアルにデータ
-	Vector4* materialData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-
-	// 今回は赤を書き込んでみる
-	// RGBA
-	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	
 
 	/////////////////////
 	// 8ページ
@@ -598,10 +584,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// バイナリを元に生成
 	ID3D12RootSignature* rootSignature = nullptr;
 	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(),
-		signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
-	assert(SUCCEEDED(hr));
-
-	hr = device->CreateRootSignature(1, signatureBlob->GetBufferPointer(),
 		signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature));
 	assert(SUCCEEDED(hr));
 
@@ -674,7 +656,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//////////////////////////
 	// VertexResourceを生成する
 	//////////////////////////
-	CreateBufferResource(device, sizeof(float) * 3);
+	// リソースの作成
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+
+	// マテリアルにデータ
+	Vector4* materialData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+
+	// 今回は赤を書き込んでみる
+	// RGBA
+	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+
+	//CreateBufferResource(device, sizeof(float) * 3);
 
 	// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -1020,7 +1018,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialResource->Release();
 	wvpResource->Release();
 	
-#ifdef _DBUG
+	
+#ifdef _DEBUG
 	debugController->Release();
 #endif
 	CloseWindow(hwnd);
