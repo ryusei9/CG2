@@ -570,42 +570,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.pParameters = rootParameters;
 	// 配列の長さ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);
-	// リソースの作成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+	
 
-	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
-	// マテリアルにデータ
-	Vector4* materialData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-
-	// 今回は赤を書き込んでみる
-	// RGBA
-	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
-
-	//// WVP用のリソースを作る。
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
-
-	// データを書き込む
-	Matrix4x4* wvpData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
-
-	// 単位行列を書き込んでおく
-	*wvpData = MakeIdentity4x4();
-
-	//// データを書き込む
-	Matrix4x4* transfomationMatrixData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&transfomationMatrixData));
-
-	// 単位行列を書き込んでおく
-	*transfomationMatrixData = MakeIdentity4x4();
+	
 
 	// シリアライズしてバイナリにする
 	ID3DBlob* signatureBlob = nullptr;
@@ -693,7 +660,44 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//////////////////////////
 	// VertexResourceを生成する
 	//////////////////////////
-	CreateBufferResource(device, sizeof(float) * 3);
+	// リソースの作成
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+
+	// マテリアルにデータ
+	Vector4* materialData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+
+	// 今回は赤を書き込んでみる
+	// RGBA
+	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	
+	//CreateBufferResource(device, sizeof(float) * 3);
+
+	//// WVP用のリソースを作る。
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+
+	// データを書き込む
+	Matrix4x4* wvpData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+
+	// 単位行列を書き込んでおく
+	*wvpData = MakeIdentity4x4();
+
+	//// データを書き込む
+	Matrix4x4* transfomationMatrixData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&transfomationMatrixData));
+
+	// 単位行列を書き込んでおく
+	*transfomationMatrixData = MakeIdentity4x4();
 
 	// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -1036,18 +1040,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 解放処理
 	////////////////////
 	CloseHandle(fenceEvent);
-	materialResource->Release();
-	vertexResource->Release();
-	graphicsPipelineState->Release();
-	signatureBlob->Release();
-	if (errorBlob) {
-		errorBlob->Release();
-	}
-	rootSignature->Release();
-	pixelShaderBlob->Release();
-	vertexShaderBlob->Release();
 	fence->Release();
 	rtvDescriptorHeap->Release();
+	srvDescriptorHeap->Release();
 	swapChainResources[0]->Release();
 	swapChainResources[1]->Release();
 	swapChain->Release();
@@ -1057,7 +1052,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	device->Release();
 	useAdapter->Release();
 	dxgiFactory->Release();
-#ifdef _DBUG
+	vertexResource->Release();
+	graphicsPipelineState->Release();
+	signatureBlob->Release();
+	if (errorBlob) {
+		errorBlob->Release();
+	}
+	rootSignature->Release();
+	pixelShaderBlob->Release();
+	vertexShaderBlob->Release();
+	materialResource->Release();
+	wvpResource->Release();
+	
+#ifdef _DEBUG
 	debugController->Release();
 #endif
 	CloseWindow(hwnd);
