@@ -87,7 +87,7 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 	// バッファリソース。テクスチャの場合はまた別の設定をする
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	// リソースのサイズ
-	resourceDesc.Width = sizeof(sizeInBytes) * 3;
+	resourceDesc.Width = sizeof(Vector4) * 3;
 
 	// バッファの場合はこれらは1にする決まり
 	resourceDesc.Height = 1;
@@ -361,21 +361,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.pParameters = rootParameters;
 	// 配列の長さ
 	descriptionRootSignature.NumParameters = _countof(rootParameters);
-	// リソースの作成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
-	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-
-	// マテリアルにデータ
-	Vector4* materialData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-
-	// 今回は赤を書き込んでみる
-	// RGBA
-	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	
 
 	// シリアライズしてバイナリにする
 	ID3DBlob* signatureBlob = nullptr;
@@ -463,36 +449,51 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//////////////////////////
 	// VertexResourceを生成する
 	//////////////////////////
-	// 頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	// リソースの作成
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
 
-	// UploadHeapを使う
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 
-	// 頂点リソースの設定
-	D3D12_RESOURCE_DESC vertexResourceDesc{};
+	// マテリアルにデータ
+	Vector4* materialData = nullptr;
 
-	// バッファリソース。テクスチャの場合はまた別の設定をする
-	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	// リソースのサイズ
-	vertexResourceDesc.Width = sizeof(Vector4) * 3;
+	// 書き込むためのアドレスを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
-	// バッファの場合はこれらは1にする決まり
-	vertexResourceDesc.Height = 1;
-	vertexResourceDesc.DepthOrArraySize = 1;
-	vertexResourceDesc.MipLevels = 1;
-	vertexResourceDesc.SampleDesc.Count = 1;
+	// 今回は赤を書き込んでみる
+	// RGBA
+	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
+	//// 頂点リソース用のヒープの設定
+	//D3D12_HEAP_PROPERTIES uploadHeapProperties{};
 
-	// バッファの場合はこれにする決まり
-	vertexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	//// UploadHeapを使う
+	//uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
+
+	//// 頂点リソースの設定
+	//D3D12_RESOURCE_DESC vertexResourceDesc{};
+
+	//// バッファリソース。テクスチャの場合はまた別の設定をする
+	//vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	//// リソースのサイズ
+	//vertexResourceDesc.Width = sizeof(Vector4) * 3;
+
+	//// バッファの場合はこれらは1にする決まり
+	//vertexResourceDesc.Height = 1;
+	//vertexResourceDesc.DepthOrArraySize = 1;
+	//vertexResourceDesc.MipLevels = 1;
+	//vertexResourceDesc.SampleDesc.Count = 1;
+
+	//// バッファの場合はこれにする決まり
+	//vertexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 
 
-	// 実際に頂点リソースを作る
-	
-	hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-		&vertexResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexResource));
-	assert(SUCCEEDED(hr));
+	//// 実際に頂点リソースを作る
+	//
+	//hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
+	//	&vertexResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&vertexResource));
+	//assert(SUCCEEDED(hr));
 
 	// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -697,7 +698,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			barrier.Transition.pResource = swapChainResources[backBufferIndex];
 
 			// 遷移前(現在)のResourceState
-			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT ;
+			barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 			// 遷移後のResourceState
 			barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
@@ -791,6 +792,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	device->Release();
 	useAdapter->Release();
 	dxgiFactory->Release();
+	
 	vertexResource->Release();
 	graphicsPipelineState->Release();
 	signatureBlob->Release();
@@ -800,8 +802,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	rootSignature->Release();
 	pixelShaderBlob->Release();
 	vertexShaderBlob->Release();
+
 	materialResource->Release();
-#ifdef _DBUG
+	
+#ifdef _DEBUG
 	debugController->Release();
 #endif
 	CloseWindow(hwnd);
