@@ -87,7 +87,7 @@ ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
 	// バッファリソース。テクスチャの場合はまた別の設定をする
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
 	// リソースのサイズ
-	resourceDesc.Width = sizeof(Vector4) * 3;
+	resourceDesc.Width = sizeInBytes;
 
 	// バッファの場合はこれらは1にする決まり
 	resourceDesc.Height = 1;
