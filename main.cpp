@@ -1177,10 +1177,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
-			ImGui::InputFloat4("color", &materialData->x);
+			ImGui::ColorEdit3("color", &materialData->x);
+			ImGui::DragFloat3("translate", &transform.translate.x, 0.001f);
+			ImGui::DragFloat3("rotate", &transform.rotate.x, 0.001f);
+			ImGui::DragFloat3("scale", &transform.scale.x, 0.001f);
 			// ゲームの処理
 			
-			transform.rotate.y += 0.01f;
+			//transform.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			*wvpData = worldMatrix;
 
