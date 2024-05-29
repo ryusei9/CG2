@@ -12,7 +12,7 @@
 #include "externals/imgui/imgui_impl_win32.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #include "externals/DirectXTex/DirectXTex.h"
-
+#include <numbers>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -69,6 +69,11 @@ struct Transform {
 struct VertexData {
 	Vector4 position;
 	Vector2 texcoord;
+};
+
+struct Sphere {
+	Vector3 center;
+	float radius;
 };
 
 // 単位行列
@@ -238,6 +243,65 @@ Matrix4x4 MakeOrthographicMatrix(float left, float top, float right, float botto
 	resultOrthographicMatrix.m[3][2] = nearClip / (nearClip - farClip);
 	resultOrthographicMatrix.m[3][3] = 1;
 	return resultOrthographicMatrix;
+}
+
+Vector3 TransformMatrix(const Vector3& vector, const Matrix4x4& matrix) {
+	Vector3 resultTransform = {};
+	resultTransform.x = vector.x * matrix.m[0][0] + vector.y * matrix.m[1][0] + vector.z * matrix.m[2][0] + 1.0f * matrix.m[3][0];
+	resultTransform.y = vector.x * matrix.m[0][1] + vector.y * matrix.m[1][1] + vector.z * matrix.m[2][1] + 1.0f * matrix.m[3][1];
+	resultTransform.z = vector.x * matrix.m[0][2] + vector.y * matrix.m[1][2] + vector.z * matrix.m[2][2] + 1.0f * matrix.m[3][2];
+
+	float w = vector.x * matrix.m[0][3] + vector.y * matrix.m[1][3] + vector.z * matrix.m[2][3] + 1.0f * matrix.m[3][3];
+	assert(w != 0.0f);
+	resultTransform.x /= w;
+	resultTransform.y /= w;
+	resultTransform.z /= w;
+
+	return resultTransform;
+}
+
+void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix,VertexData* vertexData, uint32_t color) {
+	const uint32_t kSubdivision = 10;
+	const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	// 緯度の方向に分割 -π ~ π/2
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
+		// 緯度の方向に分割 0 ~ 2π
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			float lon = lonIndex * kLonEvery;
+			float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+			float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
+			// ワールド座標系でのabcを求める
+			//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
+			//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
+			//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
+			//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
+			//// abcをscreen座標系まで変換
+			//a = TransformMatrix(a, viewProjectionMatrix);
+			//a = TransformMatrix(a, viewPortMatrix);
+			//b = TransformMatrix(b, viewProjectionMatrix);
+			//b = TransformMatrix(b, viewPortMatrix);
+			//c = TransformMatrix(c, viewProjectionMatrix);
+			//c = TransformMatrix(c, viewPortMatrix);
+			//d = TransformMatrix(d, viewProjectionMatrix);
+			//d = TransformMatrix(d, viewPortMatrix);
+			vertexData[start].position.x = cos(lat) * cos(lon);
+			vertexData[start].position.y = sin(lat);
+			vertexData[start].position.z = cos(lat) * sin(lon);
+			vertexData[start].position.w = 1.0f;
+			vertexData[start].texcoord = { u,v };
+			vertexData[start].position.x = cos(lat + kLatEvery) * cos(lon);
+			vertexData[start].position.y = sin(lat + kLatEvery);
+			vertexData[start].position.z = cos(lat + kLatEvery) * sin(lon);
+			vertexData[start].position.w = 1.0f;
+			vertexData[start].texcoord = { u,v };
+			// ab,bcで線を引く
+			Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
+			Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
+		}
+	}
 }
 
 // std::stringを受け取る関数
