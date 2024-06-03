@@ -260,49 +260,9 @@ Vector3 TransformMatrix(const Vector3& vector, const Matrix4x4& matrix) {
 	return resultTransform;
 }
 
-void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewPortMatrix,VertexData* vertexData, uint32_t color) {
-	const uint32_t kSubdivision = 10;
-	const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	// 緯度の方向に分割 -π ~ π/2
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
-		// 緯度の方向に分割 0 ~ 2π
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
-			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-			float lon = lonIndex * kLonEvery;
-			float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-			float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);
-			// ワールド座標系でのabcを求める
-			//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
-			//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
-			//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
-			//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
-			//// abcをscreen座標系まで変換
-			//a = TransformMatrix(a, viewProjectionMatrix);
-			//a = TransformMatrix(a, viewPortMatrix);
-			//b = TransformMatrix(b, viewProjectionMatrix);
-			//b = TransformMatrix(b, viewPortMatrix);
-			//c = TransformMatrix(c, viewProjectionMatrix);
-			//c = TransformMatrix(c, viewPortMatrix);
-			//d = TransformMatrix(d, viewProjectionMatrix);
-			//d = TransformMatrix(d, viewPortMatrix);
-			vertexData[start].position.x = cos(lat) * cos(lon);
-			vertexData[start].position.y = sin(lat);
-			vertexData[start].position.z = cos(lat) * sin(lon);
-			vertexData[start].position.w = 1.0f;
-			vertexData[start].texcoord = { u,v };
-			vertexData[start].position.x = cos(lat + kLatEvery) * cos(lon);
-			vertexData[start].position.y = sin(lat + kLatEvery);
-			vertexData[start].position.z = cos(lat + kLatEvery) * sin(lon);
-			vertexData[start].position.w = 1.0f;
-			vertexData[start].texcoord = { u,v };
-			// ab,bcで線を引く
-			Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
-			Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
-		}
-	}
-}
+
+	
+
 
 // std::stringを受け取る関数
 void Log(const std::string& message) {
@@ -942,7 +902,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// VertexResourceを生成する
 	//////////////////////////
 	// リソースの作成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 6);
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 1536);
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
@@ -1015,7 +975,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 
 	// 使用するリソースのサイズは頂点3つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferView.SizeInBytes = sizeof(VertexData) * 1536;
 
 	// 1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -1027,28 +987,79 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
 	// 左下
-	vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
-	vertexData[0].texcoord = { 0.0f,1.0f };
+	//vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
+	//vertexData[0].texcoord = { 0.0f,1.0f };
 
-	// 上
-	vertexData[1].position = { 0.0f,0.5f,0.0f,1.0f };
-	vertexData[1].texcoord = { 0.5f,0.0f };
+	//// 上
+	//vertexData[1].position = { 0.0f,0.5f,0.0f,1.0f };
+	//vertexData[1].texcoord = { 0.5f,0.0f };
 
-	// 右下
-	vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
-	vertexData[2].texcoord = { 1.0f,1.0f };
+	//// 右下
+	//vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
+	//vertexData[2].texcoord = { 1.0f,1.0f };
 
-	// 左下2
-	vertexData[3].position = { -0.5f,-0.5f,0.5f,1.0f };
-	vertexData[3].texcoord = { 0.0f,1.0f };
+	//// 左下2
+	//vertexData[3].position = { -0.5f,-0.5f,0.5f,1.0f };
+	//vertexData[3].texcoord = { 0.0f,1.0f };
 
-	// 上2
-	vertexData[4].position = { 0.0f,0.0f,0.0f,1.0f };
-	vertexData[4].texcoord = { 0.5f,0.0f };
+	//// 上2
+	//vertexData[4].position = { 0.0f,0.0f,0.0f,1.0f };
+	//vertexData[4].texcoord = { 0.5f,0.0f };
 
-	// 右下2
-	vertexData[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
-	vertexData[5].texcoord = { 1.0f,1.0f };
+	//// 右下2
+	//vertexData[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
+	//vertexData[5].texcoord = { 1.0f,1.0f };
+
+	const uint32_t kSubdivision = 16;
+	const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	// 緯度の方向に分割 -π ~ π/2
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
+		// 緯度の方向に分割 0 ~ 2π
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			float lon = lonIndex * kLonEvery;
+			/*float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+			float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);*/
+			// ワールド座標系でのabcを求める
+			//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
+			//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
+			//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
+			//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
+			//// abcをscreen座標系まで変換
+			//a = TransformMatrix(a, viewProjectionMatrix);
+			//a = TransformMatrix(a, viewPortMatrix);
+			//b = TransformMatrix(b, viewProjectionMatrix);
+			//b = TransformMatrix(b, viewPortMatrix);
+			//c = TransformMatrix(c, viewProjectionMatrix);
+			//c = TransformMatrix(c, viewPortMatrix);
+			//d = TransformMatrix(d, viewProjectionMatrix);
+			//d = TransformMatrix(d, viewPortMatrix);
+			vertexData[start].position = { cos(lat) * cos(lon),sin(lat),cos(lat) * sin(lon),1.0f };
+			vertexData[start].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
+			
+			vertexData[start + 1].position = { cos(lat + kLatEvery) * cos(lon) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon) ,1.0f };
+			vertexData[start + 1].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision), 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision) };
+			
+			vertexData[start + 2].position = { cos(lat) * cos(lon + kLonEvery) ,sin(lat) ,cos(lat) * sin(lon + kLonEvery) , 1.0f };
+			vertexData[start + 2].texcoord = { static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
+
+			vertexData[start + 3].position = { cos(lat + kLatEvery) * cos(lon + kLonEvery) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon + kLonEvery) ,1.0f };
+			vertexData[start + 3].texcoord = { static_cast<float>(lonIndex + 1.0f) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex + 1.0f) / static_cast<float>(kSubdivision) };
+
+			vertexData[start + 4] = vertexData[start + 2];
+			vertexData[start + 4] = vertexData[start + 2];
+			
+			vertexData[start + 5] = vertexData[start + 1];
+			vertexData[start + 5] = vertexData[start + 1];
+			
+			
+			//// ab,bcで線を引く
+			//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
+			//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
+		}
+	}
 
 	VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
@@ -1068,6 +1079,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	vertexDataSprite[4].texcoord = { 1.0f,0.0f };
 	vertexDataSprite[5].position = { 640.0f,360.0f,0.0f,1.0f };
 	vertexDataSprite[5].texcoord = { 1.0f,1.0f };
+
+	
 
 	// ビューポート
 	D3D12_VIEWPORT viewport{};
@@ -1266,7 +1279,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Transform cameraTransform{
 		{1.0f,1.0f,1.0f},
 		{0.0f,0.0f,0.0f},
-		{0.0f,0.0f,-5.0f}
+		{0.0f,0.0f,-10.0f}
 	};
 
 	Transform transformSprite{
@@ -1304,7 +1317,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
-			ImGui::InputFloat4("color", &materialData->x);
+			ImGui::ColorEdit3("color", &materialData->x);
+			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			// ゲームの処理
 			
 			transform.rotate.y += 0.01f;
@@ -1397,7 +1411,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(6, 1, 0, 0);
+			commandList->DrawInstanced(1536, 1, 0, 0);
 
 			// Spriteの描画。変更が必要なものだけ変更する
 			// VBVを設定
@@ -1406,6 +1420,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			// 描画
 			commandList->DrawInstanced(6, 1, 0, 0);
+
+			
 
 			// 実際のcommandListのImGuiの描画コマンドを積む
 			ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
