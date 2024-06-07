@@ -954,7 +954,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 1536);
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
-	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4) * 3);
+	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Material) * 3);
 
 	// Sprite用の頂点リソースを作る
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -979,10 +979,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// RGBA
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
+	materialData->enableLighting = true;
+
 	//CreateBufferResource(device, sizeof(float) * 3);
 
 	//// WVP用のリソースを作る。
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(TransformationMatrix));
 
 	// DepthStencilTextureをウィンドウのサイズで作成
 	ID3D12Resource* depthStencilResource = CreateDepthStencilTextureResource(device, kClientWidth, kClientHeight);
@@ -1037,7 +1039,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	transformationMatrixData->WVP = MakeIdentity4x4();
 
 	// Sprite用のTransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* transformationMatrixResourceSprite = CreateBufferResource(device, sizeof(TransformationMatrix));
 
 	// データを書き込む
 	TransformationMatrix* transformationMatrixDataSprite = nullptr;
@@ -1440,25 +1442,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::ColorEdit3("lightColor", &directionalLightData->color.x);
-			ImGui::DragFloat3("cameraDirection", &directionalLightData->direction.x, 0.01f);
+			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
 			// ゲームの処理
 
 			transform.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-			wvpData->WVP = worldMatrix;
+			
 
 			Matrix4x4 cameraMatrix = MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = Inverse(cameraMatrix);
 			Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
 			Matrix4x4 worldProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+			
+			wvpData->WVP = worldProjectionMatrix;
+			wvpData->World = worldMatrix;
+
 			transformationMatrixData->WVP = worldProjectionMatrix;
+			transformationMatrixData->World = worldMatrix;
 
 			// Sprite用のWorldViewProjectionMatrixを作る
 			Matrix4x4 worldMatrixSprite = MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 			Matrix4x4 viewMatrixSprite = MakeIdentity4x4();
 			Matrix4x4 projectionMatrixSprite = MakeOrthographicMatrix(0.0f, 0.0f, float(kClientWidth), float(kClientHeight), 0.0f, 100.0f);
 			Matrix4x4 worldProjectionMatrixSprite = Multiply(worldMatrixSprite, Multiply(viewMatrixSprite, projectionMatrixSprite));
+			
 			transformationMatrixDataSprite->WVP = worldProjectionMatrixSprite;
+			transformationMatrixDataSprite->World = worldMatrixSprite;
+			
 			///////////////////
 			// コマンドをキック
 			///////////////////
@@ -1525,10 +1535,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			// Lightingを行うSprite
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(3, materialResourceSprite->GetGPUVirtualAddress());
 
 			// 平行光源
-			commandList->SetGraphicsRootConstantBufferView(0, directionalLightResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
 
 			// SRVのDescriptorTableの先頭を設定。
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
