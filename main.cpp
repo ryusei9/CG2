@@ -56,6 +56,10 @@ struct Vector4 {
 	float w;
 };
 
+struct Matrix3x3 {
+	float m[3][3];
+};
+
 struct Matrix4x4 {
 	float m[4][4];
 };
@@ -80,6 +84,8 @@ struct Sphere {
 struct Material {
 	Vector4 color;
 	int32_t enableLighting;
+	float padding[3];
+	Matrix4x4 uvTransform;
 };
 
 struct TransformationMatrix {
@@ -288,7 +294,26 @@ Vector3 Normalize(const Vector3& v) {
 	return NormalizeResult;
 }
 
+Matrix4x4 MakeScaleMatrix(const Vector3& scale) {
+	Matrix4x4 resultScale = {};
+	resultScale.m[0][0] = scale.x;
+	resultScale.m[1][1] = scale.y;
+	resultScale.m[2][2] = scale.z;
+	resultScale.m[3][3] = 1;
+	return resultScale;
+}
 
+Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
+	Matrix4x4 resultTranslate = {};
+	resultTranslate.m[3][0] = translate.x;
+	resultTranslate.m[3][1] = translate.y;
+	resultTranslate.m[3][2] = translate.z;
+	resultTranslate.m[0][0] = 1;
+	resultTranslate.m[1][1] = 1;
+	resultTranslate.m[2][2] = 1;
+	resultTranslate.m[3][3] = 1;
+	return resultTranslate;
+}
 
 // std::stringを受け取る関数
 void Log(const std::string& message) {
@@ -989,6 +1014,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	indexDataSprite[0] = 0; indexDataSprite[1] = 1; indexDataSprite[2] = 2;
 	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
 
+
 	// マテリアルにデータ
 	Material* materialData = nullptr;
 
@@ -1000,6 +1026,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	materialData->enableLighting = false;
+
+	materialData->uvTransform = MakeIdentity4x4();
 
 	//CreateBufferResource(device, sizeof(float) * 3);
 
@@ -1031,6 +1059,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// SpriteはLightingしないのでfalseを設定する
 	materialDataSprite->enableLighting = false;
+
+	materialDataSprite->uvTransform = MakeIdentity4x4();
 
 	// 平行光源用のリソースを作成
 	DirectionalLight* directionalLightData = nullptr;
@@ -1167,7 +1197,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
 		}
 	}
-
+	
 	VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
 
@@ -1427,6 +1457,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{0.0f,0.0f,0.0f}
 	};
 
+	Transform uvTransformSprite{
+		{1.0f,1.0f,1.0f},
+		{0.0f,0.0f,0.0f},
+		{0.0f,0.0f,0.0f}
+	};
+
 	bool useMonsterBall = true;
 
 	/////////////////////
@@ -1460,9 +1496,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//ImGui::ShowDemoWindow();
 			ImGui::ColorEdit3("color", &materialData->color.x);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
+			ImGui::ColorEdit3("spriteColor", &materialDataSprite->color.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::ColorEdit3("lightColor", &directionalLightData->color.x);
 			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
+			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f,-10.0f,10.0f);
+			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
+			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 			// ゲームの処理
 
 			transform.rotate.y += 0.01f;
@@ -1489,6 +1529,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			transformationMatrixDataSprite->WVP = worldProjectionMatrixSprite;
 			transformationMatrixDataSprite->World = worldMatrixSprite;
 			
+			Matrix4x4 uvTransformMatrix = MakeScaleMatrix(uvTransformSprite.scale);
+			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
+			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
+			materialDataSprite->uvTransform = uvTransformMatrix;
 			///////////////////
 			// コマンドをキック
 			///////////////////
@@ -1555,7 +1599,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
 
 			// Lightingを行うSprite
-			//commandList->SetGraphicsRootConstantBufferView(3, materialResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(3, materialResourceSprite->GetGPUVirtualAddress());
 
 			// 平行光源
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
@@ -1571,7 +1615,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
-			//commandList->DrawInstanced(1536, 1, 0, 0);
+			commandList->DrawInstanced(1536, 1, 0, 0);
 
 			// Spriteを常にuvCheckerにする
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
