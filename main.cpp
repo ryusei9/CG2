@@ -13,6 +13,8 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #include "externals/DirectXTex/DirectXTex.h"
 #include <numbers>
+#include <fstream>
+#include <sstream>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -97,6 +99,10 @@ struct DirectionalLight {
 	Vector4 color; // ライトの色
 	Vector3 direction; // ライトの向き
 	float intensity; // 輝度
+};
+
+struct ModelData {
+	std::vector<VertexData> vertices;
 };
 
 // 単位行列
@@ -636,6 +642,74 @@ D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descrip
 	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	handleGPU.ptr += (descriptorSize * index);
 	return handleGPU;
+}
+
+// objファイルを読む関数
+ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename) {
+	// 変数の宣言
+	// 構築するModelData
+	ModelData modelData;
+	// 位置
+	std::vector<Vector4> positions;
+	// 法線
+	std::vector<Vector3> normals;
+	// テクスチャ座標
+	std::vector<Vector2> texcoords;
+	// ファイルから読んだ一行を格納するもの
+	std::string line;
+	
+	// ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename);
+	// 開けなかったら止める
+	assert(file.is_open());
+
+	while (std::getline(file, line)) {
+		std::string identifier;
+		std::istringstream s(line);
+		// 先頭の識別子を読む
+		s >> identifier;
+
+		// identifierに応じた処理
+		// 頂点位置
+		if (identifier == "v") {
+			Vector4 position;
+			s >> position.x >> position.y >> position.z;
+			position.w = 1.0f;
+			positions.push_back(position);
+			// 頂点テクスチャ座標
+		} else if (identifier == "vt") {
+			Vector2 texcoord;
+			s >> texcoord.x >> texcoord.y;
+			texcoords.push_back(texcoord);
+			// 頂点法線
+		} else if (identifier == "vn") {
+			Vector3 normal;
+			s >> normal.x >> normal.y >> normal.z;
+			normals.push_back(normal);
+			// 面
+		} else if (identifier == "f") {
+			// 面は三角形限定。その他は未対応
+			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex) {
+				std::string vertexDefinition;
+				s >> vertexDefinition;
+				// 頂点の要素へのIndexは「位置/UV/法線」で格納されているので分解してIndexを取得する
+				std::istringstream v(vertexDefinition);
+				uint32_t elementIndices[3];
+				for (int32_t element = 0; element < 3; ++element) {
+					std::string index;
+					// /区切りでインデックスを読んでいく
+					std::getline(v, index, '/');
+					elementIndices[element] = std::stoi(index);
+				}
+				// 要素へのIndexから、実際の要素の値を取得して、頂点を構築していく
+				Vector4 position = positions[elementIndices[0] - 1];
+				Vector2 texcoord = texcoords[elementIndices[1] - 1];
+				Vector3 normal = normals[elementIndices[2] - 1];
+				VertexData vertex = { position,texcoord,normal };
+				modelData.vertices.push_back(vertex);
+			}
+		}
+	}
 }
 
 // Windowsアプリでのエントリーポイント(main関数)
