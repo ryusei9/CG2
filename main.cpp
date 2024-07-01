@@ -101,9 +101,16 @@ struct DirectionalLight {
 	float intensity; // 輝度
 };
 
+struct MaterialData {
+	std::string textureFilePath;
+};
+
 struct ModelData {
 	std::vector<VertexData> vertices;
+	MaterialData material;
 };
+
+
 
 // 単位行列
 Matrix4x4 MakeIdentity4x4() {
@@ -644,6 +651,34 @@ D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descrip
 	return handleGPU;
 }
 
+MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename) {
+	// 変数の宣言
+	// 構築するMaterialData
+	MaterialData materialData;
+	// ファイルから読んだ一行を格納するもの
+	std::string line;
+	// ファイルを開く
+	std::ifstream file(directoryPath + "/" + filename);
+	// 開けなかったら止める
+	assert(file.is_open());
+
+	while (std::getline(file, line)) {
+		std::string identifier;
+		std::istringstream s(line);
+		s >> identifier;
+
+		// identifierに応じた処理
+		if (identifier == "map_Kd") {
+			std::string textureFilename;
+			s >> textureFilename;
+
+			// 連結してファイルパスにする
+			materialData.textureFilePath = directoryPath + "/" + textureFilename;
+		}
+	}
+	return materialData;
+}
+
 // objファイルを読む関数
 ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename) {
 	// 変数の宣言
@@ -681,6 +716,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		} else if (identifier == "vt") {
 			Vector2 texcoord;
 			s >> texcoord.x >> texcoord.y;
+			texcoord.y = 1.0f - texcoord.y;
 			texcoords.push_back(texcoord);
 			// 頂点法線
 		} else if (identifier == "vn") {
@@ -716,10 +752,19 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
+		} else if (identifier == "mtllib") {
+			// materialTemplateLibraryファイルの名前を取得する
+			std::string materialFilename;
+			s >> materialFilename;
+
+			// 基本的にobjファイルと同一階層にmtlは存在させるので、ディレクトリ名とファイル名を渡す
+			modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
 		}
 	}
 	return modelData;
 }
+
+
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -1236,61 +1281,62 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//vertexData[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
 	//vertexData[5].texcoord = { 1.0f,1.0f };
 
-	const uint32_t kSubdivision = 16;
-	const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	// 緯度の方向に分割 -π ~ π/2
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-		float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
-		// 緯度の方向に分割 0 ~ 2π
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
-			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-			float lon = lonIndex * kLonEvery;
-			/*float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-			float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);*/
-			// ワールド座標系でのabcを求める
-			//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
-			//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
-			//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
-			//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
-			//// abcをscreen座標系まで変換
-			//a = TransformMatrix(a, viewProjectionMatrix);
-			//a = TransformMatrix(a, viewPortMatrix);
-			//b = TransformMatrix(b, viewProjectionMatrix);
-			//b = TransformMatrix(b, viewPortMatrix);
-			//c = TransformMatrix(c, viewProjectionMatrix);
-			//c = TransformMatrix(c, viewPortMatrix);
-			//d = TransformMatrix(d, viewProjectionMatrix);
-			//d = TransformMatrix(d, viewPortMatrix);
-			vertexData[start].position = { cos(lat) * cos(lon),sin(lat),cos(lat) * sin(lon),1.0f };
-			vertexData[start].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
+	// 球の描画
+	//const uint32_t kSubdivision = 16;
+	//const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	//const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
+	//// 緯度の方向に分割 -π ~ π/2
+	//for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+	//	float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
+	//	// 緯度の方向に分割 0 ~ 2π
+	//	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+	//		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+	//		float lon = lonIndex * kLonEvery;
+	//		/*float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
+	//		float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);*/
+	//		// ワールド座標系でのabcを求める
+	//		//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
+	//		//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
+	//		//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
+	//		//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
+	//		//// abcをscreen座標系まで変換
+	//		//a = TransformMatrix(a, viewProjectionMatrix);
+	//		//a = TransformMatrix(a, viewPortMatrix);
+	//		//b = TransformMatrix(b, viewProjectionMatrix);
+	//		//b = TransformMatrix(b, viewPortMatrix);
+	//		//c = TransformMatrix(c, viewProjectionMatrix);
+	//		//c = TransformMatrix(c, viewPortMatrix);
+	//		//d = TransformMatrix(d, viewProjectionMatrix);
+	//		//d = TransformMatrix(d, viewPortMatrix);
+	//		vertexData[start].position = { cos(lat) * cos(lon),sin(lat),cos(lat) * sin(lon),1.0f };
+	//		vertexData[start].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
 
-			vertexData[start + 1].position = { cos(lat + kLatEvery) * cos(lon) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon) ,1.0f };
-			vertexData[start + 1].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision), 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision) };
+	//		vertexData[start + 1].position = { cos(lat + kLatEvery) * cos(lon) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon) ,1.0f };
+	//		vertexData[start + 1].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision), 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision) };
 
-			vertexData[start + 2].position = { cos(lat) * cos(lon + kLonEvery) ,sin(lat) ,cos(lat) * sin(lon + kLonEvery) , 1.0f };
-			vertexData[start + 2].texcoord = { static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
+	//		vertexData[start + 2].position = { cos(lat) * cos(lon + kLonEvery) ,sin(lat) ,cos(lat) * sin(lon + kLonEvery) , 1.0f };
+	//		vertexData[start + 2].texcoord = { static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
 
-			vertexData[start + 3].position = { cos(lat + kLatEvery) * cos(lon + kLonEvery) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon + kLonEvery) ,1.0f };
-			vertexData[start + 3].texcoord = { static_cast<float>(lonIndex + 1.0f) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex + 1.0f) / static_cast<float>(kSubdivision) };
+	//		vertexData[start + 3].position = { cos(lat + kLatEvery) * cos(lon + kLonEvery) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon + kLonEvery) ,1.0f };
+	//		vertexData[start + 3].texcoord = { static_cast<float>(lonIndex + 1.0f) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex + 1.0f) / static_cast<float>(kSubdivision) };
 
-			vertexData[start + 4] = vertexData[start + 2];
-			vertexData[start + 4] = vertexData[start + 2];
+	//		vertexData[start + 4] = vertexData[start + 2];
+	//		vertexData[start + 4] = vertexData[start + 2];
 
-			vertexData[start + 5] = vertexData[start + 1];
-			vertexData[start + 5] = vertexData[start + 1];
+	//		vertexData[start + 5] = vertexData[start + 1];
+	//		vertexData[start + 5] = vertexData[start + 1];
 
-			vertexData[start].normal = { vertexData[start].position.x,vertexData[start].position.y,vertexData[start].position.z };
-			vertexData[start + 1].normal = { vertexData[start + 1].position.x,vertexData[start + 1].position.y,vertexData[start + 1].position.z };
-			vertexData[start + 2].normal = { vertexData[start + 2].position.x,vertexData[start + 2].position.y,vertexData[start + 2].position.z };
-			vertexData[start + 3].normal = { vertexData[start + 3].position.x,vertexData[start + 3].position.y,vertexData[start + 3].position.z };
-			vertexData[start + 4].normal = { vertexData[start + 4].position.x,vertexData[start + 4].position.y,vertexData[start + 4].position.z };
-			vertexData[start + 5].normal = { vertexData[start + 5].position.x,vertexData[start + 5].position.y,vertexData[start + 5].position.z };
-			//// ab,bcで線を引く
-			//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
-			//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
-		}
-	}
+	//		vertexData[start].normal = { vertexData[start].position.x,vertexData[start].position.y,vertexData[start].position.z };
+	//		vertexData[start + 1].normal = { vertexData[start + 1].position.x,vertexData[start + 1].position.y,vertexData[start + 1].position.z };
+	//		vertexData[start + 2].normal = { vertexData[start + 2].position.x,vertexData[start + 2].position.y,vertexData[start + 2].position.z };
+	//		vertexData[start + 3].normal = { vertexData[start + 3].position.x,vertexData[start + 3].position.y,vertexData[start + 3].position.z };
+	//		vertexData[start + 4].normal = { vertexData[start + 4].position.x,vertexData[start + 4].position.y,vertexData[start + 4].position.z };
+	//		vertexData[start + 5].normal = { vertexData[start + 5].position.x,vertexData[start + 5].position.y,vertexData[start + 5].position.z };
+	//		//// ab,bcで線を引く
+	//		//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
+	//		//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
+	//	}
+	//}
 	
 	VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
@@ -1491,7 +1537,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	UploadTextureData(textureResource, mipImages[0]);
 
 	// 2枚目のTextureを読んで転送する
-	mipImages[1] = LoadTexture("resources/monsterBall.png");
+	mipImages[1] = LoadTexture(modelData.material.textureFilePath);
 	const DirectX::TexMetadata& metadata2 = mipImages[1].GetMetadata();
 	ID3D12Resource* textureResource2 = CreateTextureResource(device, metadata2);
 	UploadTextureData(textureResource2, mipImages[1]);
