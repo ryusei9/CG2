@@ -674,6 +674,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		if (identifier == "v") {
 			Vector4 position;
 			s >> position.x >> position.y >> position.z;
+			position.x *= -1.0f;
 			position.w = 1.0f;
 			positions.push_back(position);
 			// 頂点テクスチャ座標
@@ -685,9 +686,11 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 		} else if (identifier == "vn") {
 			Vector3 normal;
 			s >> normal.x >> normal.y >> normal.z;
+			normal.x *= -1.0f;
 			normals.push_back(normal);
 			// 面
 		} else if (identifier == "f") {
+			VertexData triangle[3];
 			// 面は三角形限定。その他は未対応
 			for (int32_t faceVertex = 0; faceVertex < 3; ++faceVertex) {
 				std::string vertexDefinition;
@@ -705,11 +708,17 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				Vector4 position = positions[elementIndices[0] - 1];
 				Vector2 texcoord = texcoords[elementIndices[1] - 1];
 				Vector3 normal = normals[elementIndices[2] - 1];
-				VertexData vertex = { position,texcoord,normal };
-				modelData.vertices.push_back(vertex);
+				/*VertexData vertex = { position,texcoord,normal };
+				modelData.vertices.push_back(vertex);*/
+				triangle[faceVertex] = { position,texcoord,normal };
 			}
+			// 頂点を逆順で登録することで、回り順を逆にする
+			modelData.vertices.push_back(triangle[2]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[0]);
 		}
 	}
+	return modelData;
 }
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -1049,11 +1058,49 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	//////////////////////////
 	// VertexResourceを生成する
 	//////////////////////////
+	// モデル読み込み
+	ModelData modelData = LoadObjFile("resources", "plane.obj");
 	// リソースの作成
-	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * 1536);
+	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
+
+	// 頂点バッファビューを作成する
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
+
+	// リソースの先頭のアドレスから使う
+	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+
+	// 使用するリソースのサイズは頂点のサイズ
+	vertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
+
+	// 1頂点あたりのサイズ
+	vertexBufferView.StrideInBytes = sizeof(VertexData);
+
+	// 頂点リソースにデータを書き込む
+	VertexData* vertexData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+
+	// 頂点データをリソースにコピー
+	std::memcpy(vertexData, modelData.vertices.data(), sizeof(VertexData) * modelData.vertices.size());
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Material) * 3);
+
+	// マテリアルにデータ
+	Material* materialData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+
+	// 今回は白を書き込んでみる
+	// RGBA
+	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+	materialData->enableLighting = false;
+
+	// 単位行列で初期化
+	materialData->uvTransform = MakeIdentity4x4();
 
 	// Sprite用の頂点リソースを作る
 	ID3D12Resource* vertexResourceSprite = CreateBufferResource(device, sizeof(VertexData) * 6);
@@ -1089,20 +1136,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	indexDataSprite[3] = 1; indexDataSprite[4] = 3; indexDataSprite[5] = 2;
 
 
-	// マテリアルにデータ
-	Material* materialData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-
-	// 今回は白を書き込んでみる
-	// RGBA
-	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
-
-	materialData->enableLighting = false;
-
-	// 単位行列で初期化
-	materialData->uvTransform = MakeIdentity4x4();
+	
 
 	//CreateBufferResource(device, sizeof(float) * 3);
 
@@ -1176,23 +1210,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// 単位行列を書き込んでおく
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 
-	// 頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-
-	// リソースの先頭のアドレスから使う
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-
-	// 使用するリソースのサイズは頂点3つ分のサイズ
-	vertexBufferView.SizeInBytes = sizeof(VertexData) * 1536;
-
-	// 1頂点あたりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
-
-	// 頂点リソースにデータを書き込む
-	VertexData* vertexData = nullptr;
-
-	// 書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	
 
 	// 左下
 	//vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
@@ -1572,6 +1590,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			//ImGui::ShowDemoWindow();
 			ImGui::ColorEdit3("color", &materialData->color.x);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
+			ImGui::SliderAngle("spriteRotate.x", &transform.rotate.x);
+			ImGui::SliderAngle("spriteRotate.y", &transform.rotate.y);
+			ImGui::SliderAngle("spriteRotate.z", &transform.rotate.z);
 			ImGui::ColorEdit3("spriteColor", &materialDataSprite->color.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
 			ImGui::ColorEdit3("lightColor", &directionalLightData->color.x);
@@ -1581,7 +1602,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
 			// ゲームの処理
 
-			transform.rotate.y += 0.01f;
+			//transform.rotate.y += 0.01f;
 			Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
 			
 
@@ -1691,7 +1712,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(1536, 1, 0, 0);
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
 
 			// Spriteを常にuvCheckerにする
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
@@ -1707,7 +1728,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			
 			// 描画
-			commandList->DrawIndexedInstanced(6, 1, 0, 0,0);
+			//commandList->DrawIndexedInstanced(6, 1, 0, 0,0);
 
 
 
