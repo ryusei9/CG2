@@ -1074,6 +1074,53 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
+	// Blendのフラグ
+	
+	enum BlendMode {
+		kBlendModeNone,
+		kBlendModeAdd,
+		kBlendModeSubtract,
+		kBlendModeMultiply,
+		kBlendModeScreen
+	};
+	int mode = kBlendModeScreen;
+	
+	switch (mode) {
+		// ブレンド無し
+	case kBlendModeNone:
+		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		break;
+		// 加算合成
+	case kBlendModeAdd:
+		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		break;
+		// 減算合成
+	case kBlendModeSubtract:
+		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_SUBTRACT;
+		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		break;
+		// 乗算合成
+	case kBlendModeMultiply:
+		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_ZERO;
+		blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_SRC_COLOR;
+		break;
+		// スクリーン合成
+	case kBlendModeScreen:
+		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_INV_DEST_COLOR;
+		blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+		break;
+	}
+
+	
+
 	/// RasterizerState
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// 裏面(時計回り)を表示しない
@@ -1669,6 +1716,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
 			ImGui::ColorEdit4("color", &materialData->color.x);
+			ImGui::RadioButton("kBlendModeNone", &mode,kBlendModeNone);
+			ImGui::RadioButton("kBlendModeAdd",&mode,kBlendModeAdd);
+			ImGui::RadioButton("kBlendModeSubtract", &mode, kBlendModeSubtract);
+			ImGui::RadioButton("kBlendModeMultiply", &mode, kBlendModeMultiply);
+			ImGui::RadioButton("kBlendModeScreen", &mode, kBlendModeScreen);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			ImGui::SliderAngle("spriteRotate.x", &transform.rotate.x);
 			ImGui::SliderAngle("spriteRotate.y", &transform.rotate.y);
@@ -1681,6 +1733,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
+
+
+			
 			// ゲームの処理
 
 			//transform.rotate.y += 0.01f;
