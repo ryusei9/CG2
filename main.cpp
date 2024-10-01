@@ -776,9 +776,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				triangle[faceVertex] = { position,texcoord,normal };
 			}
 			// 頂点を逆順で登録することで、回り順を逆にする
-			modelData.vertices.push_back(triangle[2]);
-			modelData.vertices.push_back(triangle[1]);
 			modelData.vertices.push_back(triangle[0]);
+			modelData.vertices.push_back(triangle[1]);
+			modelData.vertices.push_back(triangle[2]);
 		} else if (identifier == "mtllib") {
 			// materialTemplateLibraryファイルの名前を取得する
 			std::string materialFilename;
@@ -1084,7 +1084,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		kBlendModeMultiply,
 		kBlendModeScreen
 	};
-	int mode = kBlendModeScreen;
+	int mode = kBlendModeNone;
 	
 	switch (mode) {
 		// ブレンド無し
@@ -1187,7 +1187,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// VertexResourceを生成する
 	//////////////////////////
 	// モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "axis.obj");
+	ModelData modelData = LoadObjFile("resources", "fence.obj");
 	// リソースの作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 
