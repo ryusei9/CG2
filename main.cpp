@@ -799,8 +799,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// COMの初期化
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
+#ifdef _DEBUG
 	D3DResourceLeakChecker leakCheck;
-
+#endif
 	///////////////////////
 	// ウィンドウの作成
 	///////////////////////
@@ -1066,7 +1067,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	D3D12_BLEND_DESC blendDesc{};
 	// すべての色要素を書きこむ
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 	/// RasterizerState
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// 裏面(時計回り)を表示しない
@@ -1171,7 +1178,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// RGBA
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	materialData->enableLighting = false;
+	materialData->enableLighting = true;
 
 	// 単位行列で初期化
 	materialData->uvTransform = MakeIdentity4x4();
@@ -1661,15 +1668,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
-			ImGui::ColorEdit3("color", &materialData->color.x);
+			ImGui::ColorEdit4("color", &materialData->color.x);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			ImGui::SliderAngle("spriteRotate.x", &transform.rotate.x);
 			ImGui::SliderAngle("spriteRotate.y", &transform.rotate.y);
 			ImGui::SliderAngle("spriteRotate.z", &transform.rotate.z);
-			ImGui::ColorEdit3("spriteColor", &materialDataSprite->color.x);
+			ImGui::ColorEdit4("spriteColor", &materialDataSprite->color.x);
 			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::ColorEdit3("lightColor", &directionalLightData->color.x);
+			ImGui::ColorEdit4("lightColor", &directionalLightData->color.x);
 			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
+			ImGui::DragFloat("intensity", &directionalLightData->intensity, 0.01f);
 			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
 			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
 			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
