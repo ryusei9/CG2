@@ -776,9 +776,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				triangle[faceVertex] = { position,texcoord,normal };
 			}
 			// 頂点を逆順で登録することで、回り順を逆にする
-			modelData.vertices.push_back(triangle[0]);
+			/*modelData.vertices.push_back(triangle[0]);
 			modelData.vertices.push_back(triangle[1]);
-			modelData.vertices.push_back(triangle[2]);
+			modelData.vertices.push_back(triangle[2]);*/
 		} else if (identifier == "mtllib") {
 			// materialTemplateLibraryファイルの名前を取得する
 			std::string materialFilename;
@@ -975,9 +975,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// Offsetを自動計算
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	// 0から始まる
+	descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+	// 数は1つ
+	descriptorRangeForInstancing[0].NumDescriptors = 1;
+	// SRVを使う
+	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	// Offsetを自動計算
+	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
 	// CBVを使う
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;// b0のbと一致
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// DescriptorTableを使う
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	// CBVを使う
@@ -994,6 +1004,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// レジスタ番号0とバインド
 	rootParameters[0].Descriptor.ShaderRegister = 0;// b0の0と一致
 	rootParameters[1].Descriptor.ShaderRegister = 0;
+	// Tableの中身の配列を指定
+	rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	// Tableで利用する数
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
 	// Tableの中身の配列を指定
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
 	// Tableで利用する数
@@ -1130,12 +1144,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	/// VertexShader
 	// shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Particle.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(vertexShaderBlob != nullptr);
 
 	/// PixelShader
 	// shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Particle.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(pixelShaderBlob != nullptr);
 
 	// DepthStencilStateの設定
@@ -1187,7 +1201,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// VertexResourceを生成する
 	//////////////////////////
 	// モデル読み込み
-	ModelData modelData = LoadObjFile("resources", "fence.obj");
+	//ModelData modelData = LoadObjFile("resources", "plane.obj");
+	ModelData modelData;
+
+	modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texcoord = {0.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 左上
+	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
+	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
+	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
+	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
+	modelData.vertices.push_back({ .position = {1.0f,-1.0f,0.0f,1.0f},.texcoord = {1.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 右下
+	modelData.material.textureFilePath = "./resources/uvChecker.png";
 	// リソースの作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 
@@ -1339,88 +1362,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	transformationMatrixDataSprite->WVP = MakeIdentity4x4();
 
 
+	const uint32_t kNumInstance = 10;
 
-	// 左下
-	//vertexData[0].position = { -0.5f,-0.5f,0.0f,1.0f };
-	//vertexData[0].texcoord = { 0.0f,1.0f };
+	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource = CreateBufferResource(device, sizeof(TransformationMatrix) * kNumInstance);
 
-	//// 上
-	//vertexData[1].position = { 0.0f,0.5f,0.0f,1.0f };
-	//vertexData[1].texcoord = { 0.5f,0.0f };
+	TransformationMatrix* instancingData = nullptr;
+	instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&instancingData));
 
-	//// 右下
-	//vertexData[2].position = { 0.5f,-0.5f,0.0f,1.0f };
-	//vertexData[2].texcoord = { 1.0f,1.0f };
-
-	//// 左下2
-	//vertexData[3].position = { -0.5f,-0.5f,0.5f,1.0f };
-	//vertexData[3].texcoord = { 0.0f,1.0f };
-
-	//// 上2
-	//vertexData[4].position = { 0.0f,0.0f,0.0f,1.0f };
-	//vertexData[4].texcoord = { 0.5f,0.0f };
-
-	//// 右下2
-	//vertexData[5].position = { 0.5f,-0.5f,-0.5f,1.0f };
-	//vertexData[5].texcoord = { 1.0f,1.0f };
-
-	// 球の描画
-	//const uint32_t kSubdivision = 16;
-	//const float kLonEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	//const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubdivision);
-	//// 緯度の方向に分割 -π ~ π/2
-	//for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-	//	float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
-	//	// 緯度の方向に分割 0 ~ 2π
-	//	for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
-	//		uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-	//		float lon = lonIndex * kLonEvery;
-	//		/*float u = static_cast<float>(lonIndex) / static_cast<float>(kSubdivision);
-	//		float v = 1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision);*/
-	//		// ワールド座標系でのabcを求める
-	//		//Vector3 a = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon) };
-	//		//Vector3 b = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon) };
-	//		//Vector3 c = { sphere.center.x + sphere.radius * std::cosf(lat) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat),sphere.center.x + sphere.radius * std::cosf(lat) * std::sinf(lon + kLonEvery) };
-	//		//Vector3 d = { sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::cosf(lon + kLonEvery),sphere.center.y + sphere.radius * std::sinf(lat + kLatEvery),sphere.center.x + sphere.radius * std::cosf(lat + kLatEvery) * std::sinf(lon + kLonEvery) };
-	//		//// abcをscreen座標系まで変換
-	//		//a = TransformMatrix(a, viewProjectionMatrix);
-	//		//a = TransformMatrix(a, viewPortMatrix);
-	//		//b = TransformMatrix(b, viewProjectionMatrix);
-	//		//b = TransformMatrix(b, viewPortMatrix);
-	//		//c = TransformMatrix(c, viewProjectionMatrix);
-	//		//c = TransformMatrix(c, viewPortMatrix);
-	//		//d = TransformMatrix(d, viewProjectionMatrix);
-	//		//d = TransformMatrix(d, viewPortMatrix);
-	//		vertexData[start].position = { cos(lat) * cos(lon),sin(lat),cos(lat) * sin(lon),1.0f };
-	//		vertexData[start].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
-
-	//		vertexData[start + 1].position = { cos(lat + kLatEvery) * cos(lon) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon) ,1.0f };
-	//		vertexData[start + 1].texcoord = { static_cast<float>(lonIndex) / static_cast<float>(kSubdivision), 1.0f - static_cast<float>(latIndex + 1) / static_cast<float>(kSubdivision) };
-
-	//		vertexData[start + 2].position = { cos(lat) * cos(lon + kLonEvery) ,sin(lat) ,cos(lat) * sin(lon + kLonEvery) , 1.0f };
-	//		vertexData[start + 2].texcoord = { static_cast<float>(lonIndex + 1) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex) / static_cast<float>(kSubdivision) };
-
-	//		vertexData[start + 3].position = { cos(lat + kLatEvery) * cos(lon + kLonEvery) ,sin(lat + kLatEvery) ,cos(lat + kLatEvery) * sin(lon + kLonEvery) ,1.0f };
-	//		vertexData[start + 3].texcoord = { static_cast<float>(lonIndex + 1.0f) / static_cast<float>(kSubdivision),1.0f - static_cast<float>(latIndex + 1.0f) / static_cast<float>(kSubdivision) };
-
-	//		vertexData[start + 4] = vertexData[start + 2];
-	//		vertexData[start + 4] = vertexData[start + 2];
-
-	//		vertexData[start + 5] = vertexData[start + 1];
-	//		vertexData[start + 5] = vertexData[start + 1];
-
-	//		vertexData[start].normal = { vertexData[start].position.x,vertexData[start].position.y,vertexData[start].position.z };
-	//		vertexData[start + 1].normal = { vertexData[start + 1].position.x,vertexData[start + 1].position.y,vertexData[start + 1].position.z };
-	//		vertexData[start + 2].normal = { vertexData[start + 2].position.x,vertexData[start + 2].position.y,vertexData[start + 2].position.z };
-	//		vertexData[start + 3].normal = { vertexData[start + 3].position.x,vertexData[start + 3].position.y,vertexData[start + 3].position.z };
-	//		vertexData[start + 4].normal = { vertexData[start + 4].position.x,vertexData[start + 4].position.y,vertexData[start + 4].position.z };
-	//		vertexData[start + 5].normal = { vertexData[start + 5].position.x,vertexData[start + 5].position.y,vertexData[start + 5].position.z };
-	//		//// ab,bcで線を引く
-	//		//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(b.x), static_cast<int>(b.y), color);
-	//		//Novice::DrawLine(static_cast<int>(a.x), static_cast<int>(a.y), static_cast<int>(c.x), static_cast<int>(c.y), color);
-	//	}
-	//}
-
+	for (uint32_t index = 0; index < kNumInstance; ++index) {
+		instancingData[index].WVP = MakeIdentity4x4();
+		instancingData[index].World = MakeIdentity4x4();
+	}
+	
 	VertexData* vertexDataSprite = nullptr;
 	vertexResourceSprite->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
 
@@ -1659,6 +1612,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// SRVの生成
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
+	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	instancingSrvDesc.Buffer.FirstElement = 0;
+	instancingSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	instancingSrvDesc.Buffer.NumElements = kNumInstance;
+	instancingSrvDesc.Buffer.StructureByteStride = sizeof(TransformationMatrix);
+	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
+	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+
 	// Transform変数を作る
 	Transform transform{
 		{1.0f,1.0f,1.0f},
@@ -1683,6 +1648,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		{0.0f,0.0f,0.0f},
 		{0.0f,0.0f,0.0f}
 	};
+
+	Transform transforms[kNumInstance];
+	for (uint32_t index = 0; index < kNumInstance; ++index) {
+		transforms[index].scale = { 1.0f,1.0f,1.0f };
+		transforms[index].rotate = { 0.0f,0.0f,0.0f };
+		transforms[index].translate = {index * 0.1f,index * 0.1f,index * 0.1f };
+	}
 
 	bool useMonsterBall = true;
 
@@ -1716,25 +1688,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
 			ImGui::ColorEdit4("color", &materialData->color.x);
-			ImGui::RadioButton("kBlendModeNone", &mode,kBlendModeNone);
-			ImGui::RadioButton("kBlendModeAdd",&mode,kBlendModeAdd);
-			ImGui::RadioButton("kBlendModeSubtract", &mode, kBlendModeSubtract);
-			ImGui::RadioButton("kBlendModeMultiply", &mode, kBlendModeMultiply);
-			ImGui::RadioButton("kBlendModeScreen", &mode, kBlendModeScreen);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
-			ImGui::SliderAngle("spriteRotate.x", &transform.rotate.x);
-			ImGui::SliderAngle("spriteRotate.y", &transform.rotate.y);
-			ImGui::SliderAngle("spriteRotate.z", &transform.rotate.z);
-			ImGui::ColorEdit4("spriteColor", &materialDataSprite->color.x);
-			ImGui::Checkbox("useMonsterBall", &useMonsterBall);
-			ImGui::ColorEdit4("lightColor", &directionalLightData->color.x);
-			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
-			ImGui::DragFloat("intensity", &directionalLightData->intensity, 0.01f);
-			ImGui::DragFloat2("UVTranslate", &uvTransformSprite.translate.x, 0.01f, -10.0f, 10.0f);
-			ImGui::DragFloat2("UVScale", &uvTransformSprite.scale.x, 0.01f, -10.0f, 10.0f);
-			ImGui::SliderAngle("UVRotate", &uvTransformSprite.rotate.z);
-
-
+			ImGui::SliderFloat3("transforms.translate", &transforms[0].translate.x,0.0f,10.0f);
+			ImGui::SliderAngle("transforms.rotate.y", &transforms[0].rotate.y);
 			
 			// ゲームの処理
 
@@ -1766,6 +1722,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeRotateZMatrix(uvTransformSprite.rotate.z));
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
+
+			for (uint32_t index = 0; index < kNumInstance; ++index) {
+				Matrix4x4 worldMatrix = MakeAffineMatrix(transforms[index].scale, transforms[index].rotate, transforms[index].translate);
+				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+				instancingData[index].WVP = worldViewProjectionMatrix;
+				instancingData[index].World = worldMatrix;
+			}
 			///////////////////
 			// コマンドをキック
 			///////////////////
@@ -1829,8 +1792,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
 			// wvp用のCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-
+			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
 			// Lightingを行うSprite
 			commandList->SetGraphicsRootConstantBufferView(3, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
@@ -1848,24 +1811,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-
+			//commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), kNumInstance, 0, 0);
+			
 			// Spriteを常にuvCheckerにする
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			// Spriteの描画。変更が必要なものだけ変更する
-			// VBVを設定
-			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			//// Spriteの描画。変更が必要なものだけ変更する
+			//// VBVを設定
+			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			//commandList->IASetIndexBuffer(&indexBufferViewSprite);
 
-			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 
-			// TransformationMatrixCBufferの場所を設定
-			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
-
+			//
 			// 描画
 			//commandList->DrawIndexedInstanced(6, 1, 0, 0,0);
-
+			
 
 
 			// 実際のcommandListのImGuiの描画コマンドを積む
