@@ -17,6 +17,7 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg
 #include <sstream>
 #include <wrl.h>
 #include <random>
+#include <numbers>
 
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -422,6 +423,18 @@ Matrix4x4 MakeTranslateMatrix(const Vector3& translate) {
 	resultTranslate.m[2][2] = 1;
 	resultTranslate.m[3][3] = 1;
 	return resultTranslate;
+}
+
+
+// 行列の積
+Matrix4x4 MatrixMultiply(const Matrix4x4& scaleMatrix, const Matrix4x4& rotateMatrix, const Matrix4x4& translateMatrix) {
+	Matrix4x4 resultMultiply = {};
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			resultMultiply.m[i][j] = scaleMatrix.m[i][j] * rotateMatrix.m[i][j] * translateMatrix.m[i][j];
+		}
+	}
+	return resultMultiply;
 }
 
 // std::stringを受け取る関数
@@ -1720,8 +1733,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Transform cameraTransform{
 		{1.0f,1.0f,1.0f},
-		{0.0f,0.0f,0.0f},
-		{0.0f,0.0f,-10.0f}
+		{std::numbers::pi_v<float> / 3.0f,std::numbers::pi_v<float>,0.0f},
+		{0.0f,23.0f,10.0f}
 	};
 
 	Transform transformSprite{
@@ -1750,8 +1763,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	const float kDeltaTime = 1.0f / 60.0f;
 
 	bool useMonsterBall = true;
-
-	
 
 	
 
@@ -1823,14 +1834,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
 
-			
+			// 最初からこっちを向いているモデルはこれでいいが、反対側を向いているモデルは180度回転させなければならない
+			Matrix4x4 backToFrontMatrix = MakeIdentity4x4();
+
+			Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+			billboardMatrix.m[3][0] = 0.0f;
+			billboardMatrix.m[3][1] = 0.0f;
+			billboardMatrix.m[3][2] = 0.0f;
+			//billboardMatrix = MakeIdentity4x4();
 			// パーティクルが拡散し、徐々に消える
 			uint32_t numInstance = 0;	// 描画すべきインスタンス数
 			for (int index = 0; index < kNumMaxInstance; ++index) {
 				if (particles[index].lifeTime <= particles[index].currentTime) {
 					continue;
 				}
-				Matrix4x4 worldMatrix = MakeAffineMatrix(particles[index].transform.scale, particles[index].transform.rotate, particles[index].transform.translate);
+				// パーティクルの拡大と平行移動で行列を作る
+				Matrix4x4 scaleMatrix = MakeScaleMatrix(particles[index].transform.scale);
+				Matrix4x4 translatematrix = MakeTranslateMatrix(particles[index].transform.translate);
+
+				Matrix4x4 worldMatrix = Multiply(Multiply(scaleMatrix, billboardMatrix), translatematrix);
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
 				float alpha = 1.0f - (particles[index].currentTime / particles[index].lifeTime);
@@ -1843,6 +1865,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				instancingData[numInstance].color.w = alpha;
 				++numInstance;
 			}
+
+			
 			///////////////////
 			// コマンドをキック
 			///////////////////
