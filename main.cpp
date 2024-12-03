@@ -144,6 +144,16 @@ struct Emitter {
 	float frequencyTime;	// 頻度用時刻
 };
 
+struct AABB {
+	Vector3 min;
+	Vector3 max;
+};
+
+struct AccelerationField {
+	Vector3 acceleration;	// 加速度
+	AABB area;	// 範囲
+};
+
 struct D3DResourceLeakChecker {
 	~D3DResourceLeakChecker() {
 		// リソースリリースチェック
@@ -211,7 +221,15 @@ Vector3 Multiply(float scalar, const Vector3& v) {
 	MultiplyResult.z = scalar * v.z;
 	return MultiplyResult;
 }
-
+Vector3 Multiply(const Vector3& v, float scalar) {
+	Vector3 MultiplyResult = {};
+	MultiplyResult.x = scalar * v.x;
+	MultiplyResult.y = scalar * v.y;
+	MultiplyResult.z = scalar * v.z;
+	return MultiplyResult;
+}
+Vector3 operator*(float s, const Vector3& v) { return Multiply(s, v); }
+Vector3 operator*(const Vector3& v, float s) { return Multiply(s, v); }
 // 行列の加法
 Matrix4x4 Add(const Matrix4x4& m1, const Matrix4x4& m2) {
 	Matrix4x4 resultAdd = {};
@@ -909,6 +927,16 @@ std::list<Particle> Emit(const Emitter& emitter, std::mt19937& randomEngine) {
 	return particles;
 }
 
+bool IsCollision(const AABB& aabb, const Vector3& point) {
+	if ((aabb.min.x <= point.x && aabb.max.x >= point.x) &&
+		(aabb.min.y <= point.y && aabb.max.y >= point.y) &&
+		(aabb.min.z <= point.z && aabb.max.z >= point.z)) {
+		return true;
+	}
+	else {
+		return false;
+	}
+}
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -1794,6 +1822,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	bool useMonsterBall = true;
 
+	AccelerationField accelerationField;
+	accelerationField.acceleration = { 15.0f,0.0f,0.0f };
+	accelerationField.area.min = { -1.0f,-1.0f,-1.0f };
+	accelerationField.area.max = { 1.0f,1.0f,1.0f };
+
+	bool fieldUpdate = false;
 	
 	/////////////////////
 	// ImGuiの初期化
@@ -1841,6 +1875,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				particles.splice(particles.end(), Emit(emitter, randomEngine));
 			}
 			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
+			ImGui::Checkbox("update", &fieldUpdate);
 			// ゲームの処理
 
 
@@ -1897,7 +1932,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
 				float alpha = 1.0f - ((*particleIterator).currentTime / (*particleIterator).lifeTime);
+
+				// Fieldの範囲内のParticleには加速度を適用する
+				if (fieldUpdate) {
+					if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
+						(*particleIterator).velocity = (*particleIterator).velocity + accelerationField.acceleration * kDeltaTime;
+					}
+				}
 				(*particleIterator).transform.translate = Add((*particleIterator).transform.translate, Multiply(kDeltaTime, (*particleIterator).velocity));
+
+
 				(*particleIterator).currentTime += kDeltaTime;
 
 				if (numInstance < kNumMaxInstance) {
