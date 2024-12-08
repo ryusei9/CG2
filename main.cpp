@@ -140,6 +140,7 @@ struct ParticleForGPU {
 struct Emitter {
 	Transform transform;	// エミッタのtransform
 	uint32_t count;	// 発生数
+	Vector3 spawnRange;   // パーティクルが発生する範囲
 	float frequency;	// 発生頻度
 	float frequencyTime;	// 頻度用時刻
 };
@@ -903,7 +904,7 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 	return modelData;
 }
 
-Particle MakeNewParticle(std::mt19937& randomEngine,const Vector3& translate) {
+Particle MakeNewParticle(std::mt19937& randomEngine, const Vector3& translate) {
 	std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
 	std::uniform_real_distribution<float> distColor(0.0f, 1.0f);
 	std::uniform_real_distribution<float> distTime(1.0f, 3.0f);
@@ -980,7 +981,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// 利用するクラス名
 		wc.lpszClassName,
 		// タイトルバーの文字
-		L"CG2",
+		L"LE2B_13_サトウ_リュウセイ",
 		// ウィンドウスタイル
 		WS_OVERLAPPEDWINDOW,
 		// 表示X座標
@@ -1808,8 +1809,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Emitter emitter{};
 	emitter.count = 3;
-	emitter.frequency = 0.5f;
+	emitter.frequency = 0.1f;
 	emitter.frequencyTime = 0.0f;
+	emitter.spawnRange = { 10.0f, 5.0f, 10.0f };
 	emitter.transform.translate = { 0.0f,0.0f,0.0f };
 	emitter.transform.rotate = { 0.0f,0.0f,0.0f };
 	emitter.transform.scale = { 1.0f,1.0f,1.0f };
@@ -1828,7 +1830,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	accelerationField.area.max = { 1.0f,1.0f,1.0f };
 
 	bool fieldUpdate = false;
-	
+	bool chargeUpdate = false;
+
+	float attractionStrength = 5.0f; // 集める力の強さ（適宜調整）
 	/////////////////////
 	// ImGuiの初期化
 	/////////////////////
@@ -1875,7 +1879,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				particles.splice(particles.end(), Emit(emitter, randomEngine));
 			}
 			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
-			ImGui::Checkbox("update", &fieldUpdate);
+			ImGui::Checkbox("fieldUpdate", &fieldUpdate);
+			ImGui::Checkbox("chargeUpdate", &chargeUpdate);
+			ImGui::SliderFloat("attractionStrength", &attractionStrength,-50.0f,50.0f);
 			// ゲームの処理
 
 
@@ -1938,6 +1944,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 					if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
 						(*particleIterator).velocity = (*particleIterator).velocity + accelerationField.acceleration * kDeltaTime;
 					}
+				}
+				// chargeUpdateがtrueの場合、パーティクルをemitter.transformに集める
+				if (chargeUpdate) {
+					Vector3 targetPosition = emitter.transform.translate;
+					Vector3 direction = Normalize(Subtract(targetPosition, (*particleIterator).transform.translate));
+					
+					(*particleIterator).velocity = Add((*particleIterator).velocity, Multiply(attractionStrength * kDeltaTime, direction));
 				}
 				(*particleIterator).transform.translate = Add((*particleIterator).transform.translate, Multiply(kDeltaTime, (*particleIterator).velocity));
 
