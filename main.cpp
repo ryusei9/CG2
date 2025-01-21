@@ -107,6 +107,7 @@ struct Material {
 struct TransformationMatrix {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
+	Matrix4x4 WorldInverseTranspose;
 };
 
 struct DirectionalLight {
@@ -1902,6 +1903,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::ColorEdit4("lightColor", &directionalLightData->color.x);
 			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
 			ImGui::DragFloat("intensity", &directionalLightData->intensity, 0.01f);
+			ImGui::DragFloat3("sphereScale", &transform.scale.x, 0.01f);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			ImGui::DragFloat3("cameraRotation", &cameraTransform.rotate.x, 0.01f);
 
@@ -1934,6 +1936,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			wvpData->WVP = worldProjectionMatrix;
 			wvpData->World = worldMatrix;
+			wvpData->WorldInverseTranspose = Inverse(worldMatrix);
 
 			transformationMatrixData->WVP = worldProjectionMatrix;
 			transformationMatrixData->World = worldMatrix;
