@@ -101,6 +101,7 @@ struct Material {
 	int32_t enableLighting;
 	float padding[3];
 	Matrix4x4 uvTransform;
+	float shininess;
 };
 
 struct TransformationMatrix {
@@ -152,6 +153,10 @@ struct AABB {
 struct AccelerationField {
 	Vector3 acceleration;	// 加速度
 	AABB area;	// 範囲
+};
+
+struct CameraForGPU {
+	Vector3 worldPosition;
 };
 
 struct D3DResourceLeakChecker {
@@ -887,9 +892,9 @@ ModelData LoadObjFile(const std::string& directoryPath, const std::string& filen
 				triangle[faceVertex] = { position,texcoord,normal };
 			}
 			// 頂点を逆順で登録することで、回り順を逆にする
-			/*modelData.vertices.push_back(triangle[0]);
+			modelData.vertices.push_back(triangle[2]);
 			modelData.vertices.push_back(triangle[1]);
-			modelData.vertices.push_back(triangle[2]);*/
+			modelData.vertices.push_back(triangle[0]);
 		}
 		else if (identifier == "mtllib") {
 			// materialTemplateLibraryファイルの名前を取得する
@@ -1109,7 +1114,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
 	// Rootparameter作成。複数設定できるので配列。今回は結果1つだけなので長さ1の配列
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	D3D12_ROOT_PARAMETER rootParameters[5] = {};
 
 	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
 	// 0から始まる
@@ -1121,45 +1126,64 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// Offsetを自動計算
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
-	// 0から始まる
-	descriptorRangeForInstancing[0].BaseShaderRegister = 0;
-	// 数は1つ
-	descriptorRangeForInstancing[0].NumDescriptors = 1;
-	// SRVを使う
-	descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	// Offsetを自動計算
-	descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	//D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
+	//// 0から始まる
+	//descriptorRangeForInstancing[0].BaseShaderRegister = 0;
+	//// 数は1つ
+	//descriptorRangeForInstancing[0].NumDescriptors = 1;
+	//// SRVを使う
+	//descriptorRangeForInstancing[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	//// Offsetを自動計算
+	//descriptorRangeForInstancing[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	// マテリアル
 	// CBVを使う
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;// b0のbと一致
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	// DescriptorTableを使う
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	// CBVを使う
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-
 	// PixelShaderを使う
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	// vertexShaderで使う
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	// PixelShaderで使う
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
 	// レジスタ番号0とバインド
 	rootParameters[0].Descriptor.ShaderRegister = 0;// b0の0と一致
+
+	// texture
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	// vertexShaderで使う
+	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
 	rootParameters[1].Descriptor.ShaderRegister = 0;
-	// Tableの中身の配列を指定
-	rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
-	// Tableで利用する数
-	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+
+	// DescriptorTableを使う
+	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	// PixelShaderで使う
+	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	// Tableの中身の配列を指定
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
 	// Tableで利用する数
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+
+	// ライト
+	// CBVを使う
+	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+
+	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
 	// レジスタ番号1を使う
 	rootParameters[3].Descriptor.ShaderRegister = 1;
+
+	// カメラ
+	// CBVを使う
+	rootParameters[4].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+
+	rootParameters[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// レジスタ番号1を使う
+	rootParameters[4].Descriptor.ShaderRegister = 2;
+	
+	// Tableの中身の配列を指定
+	//rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeForInstancing;
+	//// Tableで利用する数
+	//rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeForInstancing);
+	
+	
 
 	//////////////////////////
 	// Samplerの設定
@@ -1244,7 +1268,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		kBlendModeMultiply,
 		kBlendModeScreen
 	};
-	int mode = kBlendModeAdd;
+	int mode = kBlendModeNone;
 
 	switch (mode) {
 		// ブレンド無し
@@ -1290,12 +1314,12 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	/// VertexShader
 	// shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Particle.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = CompileShader(L"Object3d.VS.hlsl", L"vs_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(vertexShaderBlob != nullptr);
 
 	/// PixelShader
 	// shaderをコンパイルする
-	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Particle.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
+	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = CompileShader(L"Object3d.PS.hlsl", L"ps_6_0", dxcUtils, dxcCompiler, includeHandler);
 	assert(pixelShaderBlob != nullptr);
 
 	// DepthStencilStateの設定
@@ -1303,7 +1327,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// Depthの機能を有効化する
 	depthStencilDesc.DepthEnable = true;
 	// 書き込みします
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
 	// 比較関数はLessEqual。つまり、近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 
@@ -1347,16 +1371,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// VertexResourceを生成する
 	//////////////////////////
 	// モデル読み込み
-	//ModelData modelData = LoadObjFile("resources", "plane.obj");
-	ModelData modelData;
+	ModelData modelData = LoadObjFile("resources", "monsterBall.obj");
+	//ModelData modelData;
 
-	modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texcoord = {0.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 左上
-	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
-	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
-	modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
-	modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
-	modelData.vertices.push_back({ .position = {1.0f,-1.0f,0.0f,1.0f},.texcoord = {1.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 右下
-	modelData.material.textureFilePath = "./resources/circle.png";
+	//modelData.vertices.push_back({ .position = {-1.0f,1.0f,0.0f,1.0f},.texcoord = {0.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 左上
+	//modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
+	//modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
+	//modelData.vertices.push_back({ .position = {-1.0f,-1.0f,0.0f,1.0f},.texcoord = {0.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 左下
+	//modelData.vertices.push_back({ .position = {1.0f,1.0f,0.0f,1.0f},.texcoord = {1.0f,0.0f},.normal = {0.0f,0.0f,1.0f} });// 右上
+	//modelData.vertices.push_back({ .position = {1.0f,-1.0f,0.0f,1.0f},.texcoord = {1.0f,1.0f},.normal = {0.0f,0.0f,1.0f} });// 右下
+	//modelData.material.textureFilePath = "./resources/circle.png";
 	// リソースの作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource = CreateBufferResource(device, sizeof(VertexData) * modelData.vertices.size());
 
@@ -1395,6 +1419,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 	materialData->enableLighting = true;
+
+	materialData->shininess = 50.0f;
 
 	// 単位行列で初期化
 	materialData->uvTransform = MakeIdentity4x4();
@@ -1485,6 +1511,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	// 正規化
 	Normalize(directionalLightData->direction);
+
+	// マテリアルリソースを作る
+	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource = CreateBufferResource(device, sizeof(CameraForGPU));
+
+	CameraForGPU* cameraData = nullptr;
+
+	// 書き込むためのアドレスを取得
+	cameraResource->Map(0, nullptr, reinterpret_cast<void**>(&cameraData));
+
+	// 真上から白いライトで照らす
+	cameraData->worldPosition = { 0.0f,0.0f,-10.0f };
+
+	
 
 	//// データを書き込む
 	TransformationMatrix* transformationMatrixData = nullptr;
@@ -1761,7 +1800,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	// SRVの生成
 	device->CreateShaderResourceView(textureResource2.Get(), &srvDesc2, textureSrvHandleCPU2);
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
+	/*D3D12_SHADER_RESOURCE_VIEW_DESC instancingSrvDesc{};
 	instancingSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
 	instancingSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 	instancingSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
@@ -1771,7 +1810,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	instancingSrvDesc.Buffer.StructureByteStride = sizeof(ParticleForGPU);
 	D3D12_CPU_DESCRIPTOR_HANDLE instancingSrvHandleCPU = GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU = GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, 3);
-	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);
+	device->CreateShaderResourceView(instancingResource.Get(), &instancingSrvDesc, instancingSrvHandleCPU);*/
 
 	// Transform変数を作る
 	Transform transform{
@@ -1782,8 +1821,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	Transform cameraTransform{
 		{1.0f,1.0f,1.0f},
-		{std::numbers::pi_v<float> / 3.0f,std::numbers::pi_v<float>,0.0f},
-		{0.0f,23.0f,10.0f}
+		{0.0f,0.0f,0.0f},
+		{0.0f,0.0f,-10.0f}
 	};
 
 	Transform transformSprite{
@@ -1799,7 +1838,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	};
 
 	// 乱数生成期の初期化
-	std::random_device seedGenerator;
+	/*std::random_device seedGenerator;
 	std::mt19937 randomEngine(seedGenerator());
 
 
@@ -1818,16 +1857,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 	particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 
-	const float kDeltaTime = 1.0f / 60.0f;
+	const float kDeltaTime = 1.0f / 60.0f;*/
 
 	bool useMonsterBall = true;
 
-	AccelerationField accelerationField;
+	/*AccelerationField accelerationField;
 	accelerationField.acceleration = { 15.0f,0.0f,0.0f };
 	accelerationField.area.min = { -1.0f,-1.0f,-1.0f };
 	accelerationField.area.max = { 1.0f,1.0f,1.0f };
 
-	bool fieldUpdate = false;
+	bool fieldUpdate = false;*/
 	
 	/////////////////////
 	// ImGuiの初期化
@@ -1859,14 +1898,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 			// 開発用の処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
 			//ImGui::ShowDemoWindow();
-			/*ImGui::ColorEdit4("color", &materialData->color.x);
+			ImGui::ColorEdit4("color", &materialData->color.x);
+			ImGui::ColorEdit4("lightColor", &directionalLightData->color.x);
+			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
+			ImGui::DragFloat("intensity", &directionalLightData->intensity, 0.01f);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
-			ImGui::SliderFloat3("particles.translate", &particles.transform.translate.x, 0.0f, 10.0f);
+			ImGui::DragFloat3("cameraRotation", &cameraTransform.rotate.x, 0.01f);
+
+			/*ImGui::SliderFloat3("particles.translate", &particles.transform.translate.x, 0.0f, 10.0f);
 			ImGui::SliderAngle("particles.rotate.y", &particles[0].transform.rotate.y);
 			ImGui::InputFloat("particles[0].lifeTime", &particles[0].lifeTime);
 			ImGui::InputFloat("particles[0].currentTime", &particles[0].currentTime);*/
 			// ボタンを押したらパーティクルが3つ追加される
-			if (ImGui::Button("Add Particle")) {
+			/*if (ImGui::Button("Add Particle")) {
 				particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 				particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
 				particles.push_back(MakeNewParticle(randomEngine,emitter.transform.translate));
@@ -1875,7 +1919,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 				particles.splice(particles.end(), Emit(emitter, randomEngine));
 			}
 			ImGui::DragFloat3("EmitterTranslate", &emitter.transform.translate.x, 0.01f, -100.0f, 100.0f);
-			ImGui::Checkbox("update", &fieldUpdate);
+			ImGui::Checkbox("update", &fieldUpdate);*/
 			// ゲームの処理
 
 
@@ -1908,56 +1952,56 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			uvTransformMatrix = Multiply(uvTransformMatrix, MakeTranslateMatrix(uvTransformSprite.translate));
 			materialDataSprite->uvTransform = uvTransformMatrix;
 
-			// 最初からこっちを向いているモデルはこれでいいが、反対側を向いているモデルは180度回転させなければならない
-			Matrix4x4 backToFrontMatrix = MakeIdentity4x4();
+			//// 最初からこっちを向いているモデルはこれでいいが、反対側を向いているモデルは180度回転させなければならない
+			//Matrix4x4 backToFrontMatrix = MakeIdentity4x4();
 
-			Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
-			billboardMatrix.m[3][0] = 0.0f;
-			billboardMatrix.m[3][1] = 0.0f;
-			billboardMatrix.m[3][2] = 0.0f;
-			//billboardMatrix = MakeIdentity4x4();
-			// パーティクルが拡散し、徐々に消える
-			uint32_t numInstance = 0;	// 描画すべきインスタンス数
-			for (std::list<Particle>::iterator particleIterator = particles.begin();particleIterator != particles.end();) {
-				if ((*particleIterator).lifeTime <= (*particleIterator).currentTime) {
-					particleIterator = particles.erase(particleIterator);
-					continue;
-				}
+			//Matrix4x4 billboardMatrix = Multiply(backToFrontMatrix, cameraMatrix);
+			//billboardMatrix.m[3][0] = 0.0f;
+			//billboardMatrix.m[3][1] = 0.0f;
+			//billboardMatrix.m[3][2] = 0.0f;
+			////billboardMatrix = MakeIdentity4x4();
+			//// パーティクルが拡散し、徐々に消える
+			//uint32_t numInstance = 0;	// 描画すべきインスタンス数
+			//for (std::list<Particle>::iterator particleIterator = particles.begin();particleIterator != particles.end();) {
+			//	if ((*particleIterator).lifeTime <= (*particleIterator).currentTime) {
+			//		particleIterator = particles.erase(particleIterator);
+			//		continue;
+			//	}
 
-				// パーティクルの拡大と平行移動で行列を作る
-				Matrix4x4 scaleMatrix = MakeScaleMatrix((*particleIterator).transform.scale);
-				Matrix4x4 translatematrix = MakeTranslateMatrix((*particleIterator).transform.translate);
+			//	// パーティクルの拡大と平行移動で行列を作る
+			//	Matrix4x4 scaleMatrix = MakeScaleMatrix((*particleIterator).transform.scale);
+			//	Matrix4x4 translatematrix = MakeTranslateMatrix((*particleIterator).transform.translate);
 
-				Matrix4x4 worldMatrix = Multiply(Multiply(scaleMatrix, billboardMatrix), translatematrix);
-				Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+			//	Matrix4x4 worldMatrix = Multiply(Multiply(scaleMatrix, billboardMatrix), translatematrix);
+			//	Matrix4x4 worldViewProjectionMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
 
-				float alpha = 1.0f - ((*particleIterator).currentTime / (*particleIterator).lifeTime);
+			//	float alpha = 1.0f - ((*particleIterator).currentTime / (*particleIterator).lifeTime);
 
-				// Fieldの範囲内のParticleには加速度を適用する
-				if (fieldUpdate) {
-					if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
-						(*particleIterator).velocity = (*particleIterator).velocity + accelerationField.acceleration * kDeltaTime;
-					}
-				}
-				(*particleIterator).transform.translate = Add((*particleIterator).transform.translate, Multiply(kDeltaTime, (*particleIterator).velocity));
+			//	// Fieldの範囲内のParticleには加速度を適用する
+			//	if (fieldUpdate) {
+			//		if (IsCollision(accelerationField.area, (*particleIterator).transform.translate)) {
+			//			(*particleIterator).velocity = (*particleIterator).velocity + accelerationField.acceleration * kDeltaTime;
+			//		}
+			//	}
+			//	(*particleIterator).transform.translate = Add((*particleIterator).transform.translate, Multiply(kDeltaTime, (*particleIterator).velocity));
 
 
-				(*particleIterator).currentTime += kDeltaTime;
+			//	(*particleIterator).currentTime += kDeltaTime;
 
-				if (numInstance < kNumMaxInstance) {
-					instancingData[numInstance].WVP = worldViewProjectionMatrix;
-					instancingData[numInstance].World = worldMatrix;
-					instancingData[numInstance].color = (*particleIterator).color;
-					instancingData[numInstance].color.w = alpha;
-					++numInstance;
-				}
-				++particleIterator;
-			}
-			emitter.frequencyTime += kDeltaTime;	// 時刻を進める
-			if (emitter.frequency <= emitter.frequencyTime) {	// 頻度より大きいなら発生
-				particles.splice(particles.end(), Emit(emitter, randomEngine));	// 発生処理
-				emitter.frequencyTime -= emitter.frequency;	// 余計に過ぎた時間も加味して頻度計算する
-			}
+			//	if (numInstance < kNumMaxInstance) {
+			//		instancingData[numInstance].WVP = worldViewProjectionMatrix;
+			//		instancingData[numInstance].World = worldMatrix;
+			//		instancingData[numInstance].color = (*particleIterator).color;
+			//		instancingData[numInstance].color.w = alpha;
+			//		++numInstance;
+			//	}
+			//	++particleIterator;
+			//}
+			//emitter.frequencyTime += kDeltaTime;	// 時刻を進める
+			//if (emitter.frequency <= emitter.frequencyTime) {	// 頻度より大きいなら発生
+			//	particles.splice(particles.end(), Emit(emitter, randomEngine));	// 発生処理
+			//	emitter.frequencyTime -= emitter.frequency;	// 余計に過ぎた時間も加味して頻度計算する
+			//}
 
 			///////////////////
 			// コマンドをキック
@@ -2022,13 +2066,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
 			// wvp用のCBufferの場所を設定
-			//commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-			commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
+			//commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU);
+
 			// Lightingを行うSprite
 			commandList->SetGraphicsRootConstantBufferView(3, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 
 			// 平行光源
 			commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource->GetGPUVirtualAddress());
+
+			commandList->SetGraphicsRootConstantBufferView(4, cameraResource->GetGPUVirtualAddress());
 
 			// SRVのDescriptorTableの先頭を設定。
 			commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall ? textureSrvHandleGPU2 : textureSrvHandleGPU);
@@ -2041,20 +2088,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			commandList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 			// 描画 (DrawCall)。3頂点で1つのインスタンス。
-			//commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
-			commandList->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
+			commandList->DrawInstanced(UINT(modelData.vertices.size()), 1, 0, 0);
+			//commandList->DrawInstanced(UINT(modelData.vertices.size()), numInstance, 0, 0);
 
 			// Spriteを常にuvCheckerにする
-			//commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
 
-			//// Spriteの描画。変更が必要なものだけ変更する
-			//// VBVを設定
-			//commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
-			//commandList->IASetIndexBuffer(&indexBufferViewSprite);
+			// Spriteの描画。変更が必要なものだけ変更する
+			// VBVを設定
+			commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite);
+			commandList->IASetIndexBuffer(&indexBufferViewSprite);
 
-			//commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
+			commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite->GetGPUVirtualAddress());
 
 			//
+			// TransformationMatrixCBufferの場所を設定
+			commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite->GetGPUVirtualAddress());
 			// 描画
 			//commandList->DrawIndexedInstanced(6, 1, 0, 0,0);
 
