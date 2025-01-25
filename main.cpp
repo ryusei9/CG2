@@ -102,6 +102,7 @@ struct Material {
 	float padding[3];
 	Matrix4x4 uvTransform;
 	float shininess;
+	int32_t enebleBlinnPhong;
 };
 
 struct TransformationMatrix {
@@ -1423,6 +1424,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
 	materialData->shininess = 50.0f;
 
+	materialData->enebleBlinnPhong = true;
+
 	// 単位行列で初期化
 	materialData->uvTransform = MakeIdentity4x4();
 
@@ -1903,7 +1906,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 			ImGui::ColorEdit4("lightColor", &directionalLightData->color.x);
 			ImGui::DragFloat3("lightDirection", &directionalLightData->direction.x, 0.01f);
 			ImGui::DragFloat("intensity", &directionalLightData->intensity, 0.01f);
+			ImGui::DragFloat("shininess", &materialData->shininess, 0.01f);
+		//	ImGui::Checkbox("enebleBlinnPhong", &materialData->enebleBlinnPhong);
+			ImGui::DragFloat3("sphereTranslate", &transform.translate.x, 0.01f);
 			ImGui::DragFloat3("sphereScale", &transform.scale.x, 0.01f);
+			ImGui::DragFloat3("sphereRotate", &transform.rotate.x, 0.01f);
 			ImGui::DragFloat3("cameraPosition", &cameraTransform.translate.x, 0.01f);
 			ImGui::DragFloat3("cameraRotation", &cameraTransform.rotate.x, 0.01f);
 

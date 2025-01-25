@@ -5,6 +5,7 @@ struct Material{
     uint32_t enableLighting;
     float32_t4x4 uvTransform;
     float32_t shininess;
+    uint32_t enebleBlinnPhong;
 };
 
 struct DirectionalLight
@@ -48,11 +49,20 @@ PixelShaderOutput main(VertexShaderOutput input){
     
     // phong
     float RdotE = dot(reflectLight, toEye);
-    float specularPow = pow(saturate(RdotE), gMaterial.shininess);
+   // float specularPow = pow(saturate(RdotE), gMaterial.shininess);
     
     // BlinnPhong
     float32_t3 halfVector = normalize(-gDirectionalLight.direction + toEye);
     float NdotH = dot(input.normal, halfVector);
+    float specularPow = pow(saturate(RdotE), gMaterial.shininess);
+    //if (gMaterial.enebleBlinnPhong != 0)
+    //{
+        
+    //}
+    //else
+    //{
+    //    float 
+    //}
     specularPow = pow(saturate(NdotH), gMaterial.shininess);
     
     if (gMaterial.enableLighting != 0)
