@@ -57,11 +57,11 @@ PixelShaderOutput main(VertexShaderOutput input){
     float specularPow = pow(saturate(RdotE), gMaterial.shininess);
     //if (gMaterial.enebleBlinnPhong != 0)
     //{
-        
+    //    specularPow = pow(saturate(RdotE), gMaterial.shininess);
     //}
     //else
     //{
-    //    float 
+    //    specularPow = pow(saturate(NdotH), gMaterial.shininess);
     //}
     specularPow = pow(saturate(NdotH), gMaterial.shininess);
     
