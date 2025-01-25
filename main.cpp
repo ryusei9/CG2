@@ -987,7 +987,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		// 利用するクラス名
 		wc.lpszClassName,
 		// タイトルバーの文字
-		L"CG2",
+		L"CG3_評価課題2",
 		// ウィンドウスタイル
 		WS_OVERLAPPEDWINDOW,
 		// 表示X座標
